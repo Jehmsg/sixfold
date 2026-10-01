@@ -43,6 +43,10 @@ of the fallen spire), **lantern** (solo boss), **twins** (dual bosses), **king**
 - Engrams (raid engrams roll raid-tier gear), and a **Light** power score per guardian.
 - Cosmetics: armour finishes, helmet ornaments, back/aura attachments, weapon skins, body build,
   skin/armour/trim/visor colours.
+- Equipped armour is visible on the guardian: every piece has its own silhouette per slot
+  (helmet crests, chest plates, gauntlets, leg armour, class-item back gear) and rarity
+  recolours the metal — common reads grey, uncommon green, rare blue, legendary purple,
+  exotic glowing gold — while raid set pieces lean into their raid's accent colour.
 
 ## Controls
 
