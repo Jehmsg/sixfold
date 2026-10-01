@@ -1404,7 +1404,7 @@ function makeBot(seed, i) {
 function makeBots(n) { BOTS = []; const base = randi(1, 1e6); for (let i = 0; i < n; i++) BOTS.push(makeBot(base + i * 7919, i)); }
 function placeBots(center, posts) {
   for (const b of BOTS) {
-    W.group.add(b.mesh); b.pos.set(center.x + b.off.x, center.y, center.z + b.off.z); b.down = false; b.hp = b.max; b.post = null; b.mesh.rotation.set(0, 0, 0); b.tgt = null;
+    W.group.add(b.mesh); b.pos.set(center.x + b.off.x, center.y, center.z + b.off.z); b.down = false; b.hp = b.max; b.post = null; b.avoid = null; b.stuckT = 0; b.sdir = 0; b.sk = 0; b.mesh.rotation.set(0, 0, 0); b.tgt = null;
   }
 }
 function botPick(b) {
@@ -1429,12 +1429,31 @@ function updateBots(dt) {
     if (!b.active || b.proxy) continue;
     if (b.down) { b.downT -= dt; if (b.downT <= 0) { b.down = false; b.hp = b.max; b.mesh.rotation.x = 0; } continue; }
     if (inZone('rift', b.pos)) b.hp = Math.min(b.max, b.hp + 60 * dt);
+    if (b.avoid && Math.hypot(b.avoid.x - b.pos.x, b.avoid.z - b.pos.z) < 1.05) b.avoid = null;
     let dest;
-    if (b.post) dest = b.post;
+    if (b.avoid) dest = b.avoid;
+    else if (b.post) dest = b.post;
     else { const c = Math.cos(PL.yaw), s = Math.sin(PL.yaw); dest = _v3.set(PL.pos.x + b.off.x * c + b.off.z * s, PL.pos.y, PL.pos.z - b.off.x * s + b.off.z * c); }
     const dx = dest.x - b.pos.x, dz = dest.z - b.pos.z, d = Math.hypot(dx, dz);
-    if (d > 45 || (W.noFloor && d > .3)) { b.pos.x = dest.x; b.pos.z = dest.z; }
-    else if (d > 1.0) { const sp = Math.min(d, 6.8 * dt * (d > 8 ? 1.5 : 1)); moveEnt(b.pos, dx / d * sp, dz / d * sp, .35, W.floorY, W.floorY + 1.8); b.walk += dt * 10; }
+    if (d > 45 || (W.noFloor && d > .3)) { b.pos.x = dest.x; b.pos.z = dest.z; b.avoid = null; b.stuckT = 0; b.sdir = 0; b.sk = 0; }
+    else if (d > 1.0) {
+      const sp = Math.min(d, 6.8 * dt * (d > 8 ? 1.5 : 1)), ox = b.pos.x, oz = b.pos.z;
+      moveEnt(b.pos, dx / d * sp, dz / d * sp, .35, W.floorY, W.floorY + 1.8); b.walk += dt * 10;
+      const prog = (b.pos.x - ox) * dx / d + (b.pos.z - oz) * dz / d;
+      if (prog >= sp * .25) { b.stuckT = 0; }
+      else {
+        b.stuckT = (b.stuckT || 0) + dt;
+        if (b.avoid && b.stuckT > 1.1) { b.avoid = null; b.stuckT = .46; }
+        if (!b.avoid && b.stuckT > .45) {
+          b.stuckT = 0;
+          if (!b.sdir) { b.sdir = Math.random() < .5 ? 1 : -1; b.sk = 0; } else b.sk = Math.min(12, (b.sk || 0) + 1);
+          const base = 3 + b.sk * 1.5; let ok = false;
+          for (let k = 0; k < 4; k++) { const q = base + k * 1.5, p = { x: b.pos.x - dz / d * b.sdir * q, z: b.pos.z + dx / d * b.sdir * q };
+            if (hasLOS(_v1.set(b.pos.x, b.pos.y + 1, b.pos.z), _v2.set(p.x, b.pos.y + 1, p.z))) { b.avoid = p; ok = true; break; } }
+          if (!ok) b.sdir = -b.sdir;
+        }
+      }
+    } else { b.stuckT = 0; b.sdir = 0; b.sk = 0; }
     b.pos.y = W.noFloor ? (b.post ? b.post.y : PL.pos.y) : W.floorY;
     b.mesh.position.y = b.pos.y + (d > 1 ? Math.abs(Math.sin(b.walk)) * .06 : 0);
     b.retT -= dt;
@@ -2419,7 +2438,7 @@ function localEncComplete() {
     else proceedNext();
   });
   ACT.doneMarkers = [{ pos: cpos.clone().add(new V3(0, 1.5, 0)), label: 'Chest' }, { pos: ppos.clone().add(new V3(0, 2, 0)), label: last ? 'Exit' : 'Continue' }];
-  for (const b of BOTS) b.post = null;
+  for (const b of BOTS) { b.post = null; b.avoid = null; b.stuckT = 0; b.sdir = 0; b.sk = 0; }
 }
 function spawnChest(pos, kind, label = 'Open the chest') {
   const T = ACT.theme; const g = new THREE.Group(); g.position.copy(pos);
