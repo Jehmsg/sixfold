@@ -3001,7 +3001,9 @@ function charTab() {
   const exoA = m.exoA ? `<div class="perk exo"><b>${EXO_A[m.exoA].perk}</b>${EXO_A[m.exoA].desc}</div>` : '';
   const pct = v => Math.round((1 - v) * 100);
   return `
-  <h3 style="margin-top:0">Weapons</h3>${WEAPON_SLOTS.map(eqRow).join('')}
+  <h3 style="margin-top:0">Name</h3>
+  <div class="row" style="margin-bottom:1rem"><input id="rename-in" maxlength="18" value="${esc(CH.name)}" autocomplete="off" spellcheck="false" style="flex:1;max-width:15rem"><button class="primary" id="btn-rename">Rename</button></div>
+  <h3>Weapons</h3>${WEAPON_SLOTS.map(eqRow).join('')}
   <h3>Armour</h3>${ARMOR_SLOTS.map(eqRow).join('')}
   <h3>${SLOT_NAMES[HUB.slot]}: ${cands.length} owned</h3>
   <div class="slotgrid">${cands.map(i => tileHTML(i)).join('') || '<span class="muted small">Nothing yet. Decrypt engrams to find more.</span>'}</div>
@@ -3093,6 +3095,8 @@ function wireHub(main) {
   const ai = main.querySelector('#ft-ai'); if (ai) ai.onchange = () => { NET.aiFill = ai.checked; renderHub(); };
   on('btn-ft-copy', () => { try { navigator.clipboard.writeText(NET.code); toast('Code copied'); } catch (e) { } });
   on('btn-appear', () => openCreate(true));
+  on('btn-rename', () => { const el = main.querySelector('#rename-in'); const n = (el ? el.value : '').trim().slice(0, 18); if (!n) { toast('Give your guardian a name', '#e0594d'); return; } if (n !== CH.name) { CH.name = n; saveGame(); lobbyPresence(); myFtPresence(); toast(`Renamed to ${n}`); } renderHub(); });
+  const rin = main.querySelector('#rename-in'); if (rin) rin.addEventListener('keydown', e => { if (e.key === 'Enter') main.querySelector('#btn-rename')?.click(); });
   on('btn-best', equipBest);
   on('btn-dec-all', decryptAll);
   on('btn-junk', () => { const n0 = CH.inv.length; CH.inv = CH.inv.filter(i => !(i.rarity <= 1 && CH.eq[i.slot] !== i.id)); toast(`Dismantled ${n0 - CH.inv.length} items`); saveGame(); renderHub(); });
