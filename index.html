@@ -594,6 +594,9 @@ const itemById = (ch, id) => ch.inv.find(i => i.id === id) || null;
 const eqItem = (ch, slot) => ch.eq[slot] ? itemById(ch, ch.eq[slot]) : null;
 const itemPower = it => it.kind === 'weapon' ? it.atk : it.def;
 function charLight(ch) { let s = 0; for (const sl of SLOTS) { const it = eqItem(ch, sl); if (it) s += itemPower(it); } return Math.round(s / SLOTS.length); }
+const MAX_UPG = 70, UPG_COST = [5, 10, 20, 35, 50];
+const yieldAlloys = it => Math.max(1, Math.round(itemPower(it) / 5));
+const rarityFor = p => p >= 56 ? 4 : p >= 42 ? 3 : p >= 26 ? 2 : p >= 14 ? 1 : 0;
 
 function weaponStats(it, mods) {
   const A = ARCH[it.arch]; const has = k => it.perks.includes(k);
@@ -3010,7 +3013,7 @@ function renderChars() {
   setPreview(c ? c.look : null, c ? c.cls : null, c ? cosEqOf(c) : null, c ? armorDesc(c) : null);
   if (!SAVE.chars.length) openCreate();
 }
-function playChar() { const c = SAVE.chars[SAVE.sel]; if (!c) return; CH = c; c.cp = c.cp || {}; c.clears = c.clears || {}; openHub('char'); }
+function playChar() { const c = SAVE.chars[SAVE.sel]; if (!c) return; CH = c; c.cp = c.cp || {}; c.clears = c.clears || {}; c.alloys = c.alloys || 0; openHub('char'); }
 $('#btn-play-char').onclick = playChar;
 $('#btn-del-char').onclick = () => {
   const c = SAVE.chars[SAVE.sel]; if (!c) return;
@@ -3047,7 +3050,7 @@ $('#cr-name').oninput = e => { CR.name = e.target.value; };
 $('#btn-create').onclick = () => {
   const name = ($('#cr-name').value || '').trim().slice(0, 18) || 'Guardian';
   if (CR.edit) { CH.name = name; CH.look = CR.look; saveGame(); openHub('char'); return; }
-  const ch = { id: uid(), name, cls: CR.cls, look: CR.look, inv: [], eq: {}, engrams: [], cp: {}, clears: {}, kills: 0, deaths: 0, created: Date.now() };
+  const ch = { id: uid(), name, cls: CR.cls, look: CR.look, inv: [], eq: {}, engrams: [], cp: {}, clears: {}, kills: 0, deaths: 0, alloys: 0, created: Date.now() };
   starterKit(ch); SAVE.chars.push(ch); SAVE.sel = SAVE.chars.length - 1; saveGame(); CH = ch; openHub('char');
   toast('Two engrams are waiting at the Archivist', '#d9b45b', 4000);
 };
@@ -3113,11 +3116,11 @@ let INVF = 'all';
 function invTab() {
   const F = { all: () => true, weapon: i => i.kind === 'weapon', armor: i => i.kind === 'armor', exotic: i => i.rarity === 4, raid: i => !!i.raid };
   const items = CH.inv.filter(F[INVF]).sort((a, b) => b.rarity - a.rarity || itemPower(b) - itemPower(a));
-  const junk = CH.inv.filter(i => i.rarity <= 1 && CH.eq[i.slot] !== i.id).length;
+  const junkIt = CH.inv.filter(i => i.rarity <= 1 && CH.eq[i.slot] !== i.id);
   return `<div class="filters">${[['all', 'All'], ['weapon', 'Weapons'], ['armor', 'Armour'], ['raid', 'Raid gear'], ['exotic', 'Exotics']].map(([k, l]) => `<button data-f="${k}" class="${INVF === k ? 'sel' : ''}">${l}</button>`).join('')}</div>
-  <p class="small muted" style="margin-bottom:.6rem">${CH.inv.length} of 120 slots used. A diamond marks equipped gear.</p>
+  <p class="small muted" style="margin-bottom:.6rem">${CH.inv.length} of 120 slots used. A diamond marks equipped gear. You hold <b>${CH.alloys || 0} alloys</b> — dismantle gear to earn them, Reinforce spends them.</p>
   <div class="slotgrid">${items.map(i => tileHTML(i)).join('') || '<span class="muted">Nothing here.</span>'}</div>
-  <div class="row" style="margin-top:1rem"><button id="btn-junk" ${junk ? '' : 'disabled'}>Dismantle ${junk} Common and Uncommon items</button></div>`;
+  <div class="row" style="margin-top:1rem"><button id="btn-junk" ${junkIt.length ? '' : 'disabled'}>Dismantle ${junkIt.length} Common and Uncommon items for ${junkIt.reduce((s, i) => s + yieldAlloys(i), 0)} alloys</button></div>`;
 }
 function archTab() {
   const E = CH.engrams.slice().sort((a, b) => b.rarity - a.rarity);
@@ -3191,7 +3194,7 @@ function wireHub(main) {
   const rin = main.querySelector('#rename-in'); if (rin) rin.addEventListener('keydown', e => { if (e.key === 'Enter') main.querySelector('#btn-rename')?.click(); });
   on('btn-best', equipBest);
   on('btn-dec-all', decryptAll);
-  on('btn-junk', () => { const n0 = CH.inv.length; CH.inv = CH.inv.filter(i => !(i.rarity <= 1 && CH.eq[i.slot] !== i.id)); toast(`Dismantled ${n0 - CH.inv.length} items`); saveGame(); renderHub(); });
+  on('btn-junk', () => { const gone = CH.inv.filter(i => i.rarity <= 1 && CH.eq[i.slot] !== i.id); if (!gone.length) return; const y = gone.reduce((s, i) => s + yieldAlloys(i), 0); CH.alloys = (CH.alloys || 0) + y; CH.inv = CH.inv.filter(i => !gone.includes(i)); toast(`Dismantled ${gone.length} items for +${y} alloys`); saveGame(); renderHub(); });
 }
 function hideDetail() { $('#item-detail').classList.remove('on'); }
 function statBar(label, v, max = 100, txt) { return `<div class="statbar"><span>${label}</span><span class="b"><i style="width:${clamp(v / max * 100, 2, 100)}%"></i></span><span>${txt ?? Math.round(v)}</span></div>`; }
@@ -3212,11 +3215,14 @@ function showDetail(it) {
     if (it.set) { const RR = RAID_BY_ID[it.set]; h += `<div class="perk raid"><b>${RR.set} set</b>Three pieces: 10% more damage in ${RR.name}. Five pieces: 20% more damage and 25 extra shield there.</div>`; }
   }
   if (it.rarity === 4) h += `<p class="small muted">Only one exotic ${it.kind === 'weapon' ? 'weapon' : 'armour piece'} can be equipped at a time.</p>`;
-  h += `<div class="row" style="margin-top:.8rem">${isEq ? '<span class="muted small">Equipped</span>' : `<button class="primary" id="det-eq">Equip</button>`}${isEq ? '' : `<button id="det-dis">Dismantle</button>`}<button id="det-close">Close</button></div>`;
+  const pw = itemPower(it);
+  h += `<div class="row" style="margin-top:.8rem">${isEq ? '<span class="muted small">Equipped</span>' : `<button class="primary" id="det-eq">Equip</button>`}${isEq ? '' : `<button id="det-dis">Dismantle (+${yieldAlloys(it)} alloys)</button>`}${pw < MAX_UPG ? `<button id="det-up">Reinforce +1 (${UPG_COST[it.rarity]} alloys)</button>` : '<span class="muted small">Fully reinforced</span>'}<button id="det-close">Close</button></div>`;
   el.innerHTML = h; el.classList.add('on');
   const q = id => el.querySelector('#' + id);
   if (q('det-eq')) q('det-eq').onclick = () => { if (equipItem(it)) renderHub(); };
-  if (q('det-dis')) q('det-dis').onclick = () => { CH.inv = CH.inv.filter(x => x.id !== it.id); HUB.sel = null; toast(`Dismantled ${it.name}`); saveGame(); renderHub(); };
+  if (q('det-dis')) q('det-dis').onclick = () => { const y = yieldAlloys(it); CH.alloys = (CH.alloys || 0) + y; CH.inv = CH.inv.filter(x => x.id !== it.id); HUB.sel = null; toast(`Dismantled ${it.name} for +${y} alloys`); saveGame(); renderHub(); };
+  if (q('det-up')) q('det-up').onclick = () => { const c = UPG_COST[it.rarity]; if ((CH.alloys || 0) < c) { toast('Not enough alloys — dismantle some gear first.', '#e0594d', 3600); return; }
+    const r0 = it.rarity; CH.alloys -= c; if (it.kind === 'weapon') it.atk++; else it.def++; it.rarity = Math.max(it.rarity, rarityFor(itemPower(it))); AudioSys.play('ui'); toast(it.rarity > r0 ? `${it.name} reinforced to ${itemPower(it)} Light — now ${RARITY[it.rarity].name}` : `${it.name} reinforced to ${itemPower(it)} Light`); saveGame(); renderHub(); };
   q('det-close').onclick = () => { HUB.sel = null; hideDetail(); renderHub(); };
 }
 function equipItem(it, quiet) {
