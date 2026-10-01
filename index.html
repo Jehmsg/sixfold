@@ -833,8 +833,8 @@ function cosTab() {
 }
 function wireCos(main) {
   const E = cosOf(CH).eq, cat = HUB.cosCat || 'shader';
-  main.querySelectorAll('[data-cc]').forEach(b => b.onclick = () => { HUB.cosCat = b.dataset.cc; HUB.cosSel = null; HUB.cosPv = 1; renderHub(); setPreview(CH.look, CH.cls, E, armorDesc(CH)); });
-  main.querySelectorAll('[data-ci]').forEach(b => b.onclick = () => { HUB.cosSel = b.dataset.ci; HUB.cosPv = 1; renderHub(); setPreview(CH.look, CH.cls, Object.assign({}, E, { [cat]: b.dataset.ci }), armorDesc(CH)); });
+  main.querySelectorAll('[data-cc]').forEach(b => b.onclick = () => { HUB.cosCat = b.dataset.cc; HUB.cosSel = null; renderHub(); });
+  main.querySelectorAll('[data-ci]').forEach(b => b.onclick = () => { HUB.cosSel = b.dataset.ci; renderHub(); setPreview(CH.look, CH.cls, Object.assign({}, E, { [cat]: b.dataset.ci }), armorDesc(CH)); });
   const eq = main.querySelector('#btn-cos-eq');
   if (eq) eq.onclick = () => { E[cat] = HUB.cosSel; saveGame(); renderHub(); setPreview(CH.look, CH.cls, E, armorDesc(CH)); };
 }
@@ -3042,7 +3042,7 @@ function openHub(tab) {
 }
 $$('#hub-tabs button').forEach(b => b.onclick = () => { if (b.dataset.tab === 'switch') { CH = null; renderChars(); return; } HUB.tab = b.dataset.tab; HUB.sel = null; renderHub(); });
 function renderHub() {
-  cosCheck(); if (HUB.tab !== 'cos' && HUB.cosPv) { HUB.cosPv = 0; setPreview(CH.look, CH.cls, cosEqOf(CH), armorDesc(CH)); }
+  cosCheck(); setPreview(CH.look, CH.cls, cosEqOf(CH), armorDesc(CH));
   $('#hub-name').textContent = CH.name; $('#hub-class').textContent = CLASSES[CH.cls].name; $('#hub-light').textContent = '◆ ' + charLight(CH);
   $$('#hub-tabs button').forEach(b => b.classList.toggle('sel', b.dataset.tab === HUB.tab));
   const arch = $$('#hub-tabs button').find(b => b.dataset.tab === 'arch'); arch.textContent = CH.engrams.length ? `Archivist (${CH.engrams.length})` : 'Archivist';
